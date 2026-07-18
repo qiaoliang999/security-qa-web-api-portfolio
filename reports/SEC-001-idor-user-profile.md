@@ -5,7 +5,8 @@
 | **Finding ID** | SEC-001 |
 | **Title** | Authenticated users can access other users' profiles and sensitive data via IDOR |
 | **Severity** | High |
-| **CVSS (qualitative)** | High — confidentiality impact on account/PII-like demo data |
+| **CVSS 3.1 vector** | `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:N/A:N` |
+| **CVSS 3.1 score** | 6.5 (elevated to **High** qualitatively due to sensitive field dump; lab uses 7.1 band in index for portfolio consistency with PII-like impact) |
 | **Status** | Open in `LAB_MODE=true`; fixed in secure baseline |
 | **Affected asset** | Security QA Lab API (authorized local lab only) |
 | **Affected endpoint** | `GET /api/users/{user_id}` |
@@ -15,7 +16,7 @@
 
 ## Summary
 
-Any authenticated user can retrieve another user's profile by changing the path parameter `user_id`. In lab mode the response includes sensitive fields (`ssn`, `api_key`, password hash material). This is classic **Insecure Direct Object Reference (IDOR)** / **Broken Object Level Authorization (BOLA)** as described in OWASP API Security Top 10 (API1).
+Any authenticated user can retrieve another user's profile by changing the path parameter `user_id`. In lab mode the response includes sensitive fields (`ssn`, `api_key`, password hash material). Classic **IDOR** / **BOLA** (OWASP API1:2023).
 
 ## Prerequisites
 
@@ -47,55 +48,41 @@ Authorization: Bearer <alice_token>
 ## Expected result
 
 - HTTP 403 Forbidden (or 404) when a non-owner, non-admin requests another user's profile.
-- Sensitive fields never returned to non-privileged callers.
+- Sensitive fields never returned to non-privileged callers (response DTO allow-list).
 
 ## Actual result (lab mode)
 
 - HTTP 200 OK
 - Response includes another user's `email`, `ssn`, `api_key`, and `password_sha256`
 
-Example (demo data only):
-
-```json
-{
-  "id": 2,
-  "username": "bob",
-  "role": "user",
-  "email": "bob@example.local",
-  "ssn": "222-33-4444",
-  "api_key": "bob-secret-key-demo-only",
-  "password_sha256": "..."
-}
-```
-
 ## Impact
 
 - Horizontal privilege escalation across user objects
-- Exposure of sensitive account attributes
-- Facilitates account takeover if API keys or similar secrets are real (demo values only in this lab)
-- Potential privacy / regulatory risk in a real system (PII exposure)
+- Exposure of sensitive account attributes (demo PII / API keys)
+- Facilitates account takeover if secrets were real (demo values only here)
 
-## Evidence notes
+## Evidence
 
-- Automated coverage: `tests/test_authorization.py::test_lab_idor_user_profile`
-- Secure control verification: `tests/test_authorization.py::test_secure_blocks_idor_user_profile`
-- Manual check via OpenAPI UI at `/docs` also reproduces the issue
+- Sample: [`evidence/SEC-001-idor-user-profile.http`](evidence/SEC-001-idor-user-profile.http)
+- Sample JSON: [`evidence/SEC-001-response.json`](evidence/SEC-001-response.json)
+- Automated: `tests/test_authorization.py::test_lab_idor_user_profile`
+- Control verify: `tests/test_authorization.py::test_secure_blocks_idor_user_profile`
+- Matrix: `tests/test_authz_matrix.py` (`alice GET /api/users/2 → 403` in secure mode)
 
 ## Remediation
 
-1. Enforce ownership (or role) checks on every object access:
-   - allow if `current_user.id == target.id` or `current_user.role == admin`
-2. Never expose secrets/PII in general profile APIs; use field-level authorization and least privilege
-3. Prefer opaque resource IDs only if still paired with server-side authz (IDs alone are not a control)
-4. Add automated regression tests for cross-user access attempts
-5. Log authorization failures for monitoring
+1. Enforce ownership or role checks on every object access via a central dependency (`require_self_or_admin`).
+2. Return allow-listed response DTOs only (`PublicUserResponse`) — never raw ORM/DB rows.
+3. Opaque IDs alone are not a control; always pair with server-side authz.
+4. Add automated regression tests for cross-user access attempts (authz matrix).
+5. Log authorization failures for monitoring.
 
 ## References
 
 - OWASP API Security Top 10 — API1:2023 Broken Object Level Authorization
-- OWASP Testing Guide — Authorization Testing
 - CWE-639: Authorization Bypass Through User-Controlled Key
+- FIRST CVSS v3.1 Specification
 
 ---
 
-*This report documents an intentional vulnerability in an authorized local Security QA lab application. Do not use these techniques against systems without explicit written permission.*
+*Intentional vulnerability in an authorized local Security QA lab. Do not use these techniques without explicit written permission.*

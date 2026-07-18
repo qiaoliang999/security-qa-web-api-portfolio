@@ -1,0 +1,16 @@
+{
+  "token": "lab-token-alice",
+  "user": {
+    "id": 1,
+    "username": "alice",
+    "role": "user",
+    "email": "alice@example.local",
+    "org_id": 10,
+    "bio": "",
+    "ssn": "111-22-3333",
+    "api_key": "alice-secret-key-demo-only",
+    "password_sha256": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f"
+  },
+  "session_store_size": 1,
+  "_comment": "Demo data only. Sensitive fields must not appear under LAB_MODE=false."
+}

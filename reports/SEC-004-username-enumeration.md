@@ -1,30 +1,28 @@
-# SEC-004 — Username Enumeration via Distinct Authentication Errors
+# SEC-004 — Username Enumeration via Authentication Error Messages
 
 | Field | Value |
 |-------|-------|
 | **Finding ID** | SEC-004 |
-| **Title** | Login returns different errors for unknown username vs wrong password |
+| **Title** | Distinct login error messages enable username enumeration |
 | **Severity** | Medium |
-| **CVSS (qualitative)** | Medium — information disclosure aiding credential attacks |
+| **CVSS 3.1 vector** | `CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N` |
+| **CVSS 3.1 score** | **5.3** Medium |
 | **Status** | Open in `LAB_MODE=true`; fixed in secure baseline |
 | **Affected asset** | Security QA Lab API (authorized local lab only) |
 | **Affected endpoint** | `POST /api/login` |
-| **Component** | Authentication error handling |
-| **Environment** | Local demo application — **authorized lab only** |
-| **Reporter role** | Security QA / AppSec testing |
+| **Component** | Authentication / error handling |
+| **Environment** | Local demo — **authorized lab only** |
 
 ## Summary
 
-Authentication failures use distinct messages depending on whether the username exists. Attackers can harvest valid usernames before attempting password guessing. Related lab issues on the same endpoint include predictable session tokens (`lab-token-<username>`).
+Lab mode returns `"Username not found"` vs `"Incorrect password"`. Attackers can build a valid username list before password spraying. Secure mode uses a single generic message. Lab mode also issues predictable tokens (`lab-token-{username}`); secure mode uses `secrets.token_urlsafe`.
 
 ## Prerequisites
 
-- Lab application running with `LAB_MODE=true`
-- No authentication required to probe
+- Unauthenticated access to login endpoint
+- `LAB_MODE=true`
 
 ## Steps to reproduce
-
-1. Submit a non-existent username:
 
 ```http
 POST /api/login
@@ -33,8 +31,6 @@ Content-Type: application/json
 {"username":"no-such-user","password":"x"}
 ```
 
-2. Submit a valid username with a wrong password:
-
 ```http
 POST /api/login
 Content-Type: application/json
@@ -42,47 +38,41 @@ Content-Type: application/json
 {"username":"alice","password":"bad"}
 ```
 
-3. Compare `detail` strings and note they differ.
+Compare `detail` strings and HTTP status (both 401, different bodies).
 
 ## Expected result
 
-- Identical generic message for all authentication failures (e.g., "Invalid username or password")
-- Uniform timing as much as practical
-- Rate limiting / lockout / CAPTCHA for repeated failures (not implemented in this small lab beyond message fix in secure mode)
+Identical generic error for unknown user and wrong password.
 
 ## Actual result (lab mode)
 
-- Unknown user → `"Username not found"`
-- Known user, bad password → `"Incorrect password"`
-- Successful login issues predictable token `lab-token-alice`
+Distinct messages; successful login returns `lab-token-alice`.
 
 ## Impact
 
-- Enables reliable username enumeration
-- Improves efficiency of credential stuffing and password spraying
-- Predictable tokens (companion issue) further weaken session integrity in lab mode
+- Enables targeted credential stuffing / password spraying
+- Reduces brute-force search space
+- Predictable tokens compound session risks if guessed offline
 
-## Evidence notes
+## Evidence
 
 - Automated: `tests/test_auth.py::test_lab_user_enumeration_via_distinct_errors`
-- Secure baseline: `tests/test_auth.py::test_secure_mode_no_user_enumeration`
-- Predictable token: `tests/test_auth.py::test_lab_predictable_session_token`
+- Control: `tests/test_auth.py::test_secure_mode_no_user_enumeration`
+- Token: `tests/test_auth.py::test_lab_predictable_session_token`
 
 ## Remediation
 
-1. Return a single generic authentication failure message
-2. Issue cryptographically random session tokens (e.g., 256-bit)
-3. Add throttling, account lockout or progressive delays, and monitoring for brute-force patterns
-4. Consider MFA for privileged accounts
-5. Avoid revealing account existence on registration/forgot-password flows as well
+1. Single generic error: "Invalid username or password".
+2. Constant-time-ish auth flow (always perform password verify work when practical).
+3. Cryptographically random session tokens; server-side session store.
+4. Rate limiting / lockout / CAPTCHA on auth endpoints (out of scope for this lab but recommended).
 
 ## References
 
 - OWASP Authentication Cheat Sheet
-- OWASP Testing Guide — Testing for Account Enumeration
+- CWE-203: Observable Discrepancy
 - CWE-204: Observable Response Discrepancy
-- CWE-330: Use of Insufficiently Random Values (session token companion)
 
 ---
 
-*This report documents an intentional vulnerability in an authorized local Security QA lab application. Do not use these techniques against systems without explicit written permission.*
+*Authorized local lab finding only.*

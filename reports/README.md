@@ -1,26 +1,35 @@
 # Security Findings Index
 
-Authorized local lab only. These documents describe intentional weaknesses in the demo application for Security QA portfolio practice.
+Authorized local lab only. These documents describe intentional weaknesses in the demo application for Security QA practice.
 
-| ID | Title | Severity | Endpoint(s) | Lab mode | Secure mode |
-|----|-------|----------|-------------|----------|-------------|
-| [SEC-001](SEC-001-idor-user-profile.md) | IDOR on user profiles | High | `GET /api/users/{id}` | Vulnerable | Fixed (403) |
-| [SEC-002](SEC-002-sensitive-data-exposure.md) | Sensitive data exposure in API responses | High | login / me / users | Vulnerable | Fixed |
-| [SEC-003](SEC-003-missing-function-level-auth.md) | Missing function-level auth on admin API | Critical | `GET /api/admin/users` | Vulnerable | Fixed (403) |
-| [SEC-004](SEC-004-username-enumeration.md) | Username enumeration via auth errors | Medium | `POST /api/login` | Vulnerable | Fixed |
-| [SEC-005](SEC-005-open-redirect-and-input-validation.md) | Open redirect + weak search validation | Medium | redirect / search | Vulnerable | Fixed |
+One finding per report. Each report includes CVSS 3.1 vector + qualitative severity and links to evidence samples where available.
 
-## Report template (used above)
+| ID | Title | Severity | CVSS 3.1 | Endpoint(s) |
+|----|-------|----------|----------|-------------|
+| [SEC-001](SEC-001-idor-user-profile.md) | IDOR on user profiles | High | 7.1 | `GET /api/users/{id}` |
+| [SEC-002](SEC-002-sensitive-data-exposure.md) | Sensitive data exposure in API responses | High | 7.5 | login / me / users |
+| [SEC-003](SEC-003-missing-function-level-auth.md) | Missing function-level auth on admin API | Critical | 8.8 | `GET /api/admin/users` |
+| [SEC-004](SEC-004-username-enumeration.md) | Username enumeration via auth errors | Medium | 5.3 | `POST /api/login` |
+| [SEC-005](SEC-005-open-redirect.md) | Open redirect via unrestricted `next` | Medium | 6.1 | `GET /api/redirect` |
+| [SEC-006](SEC-006-horizontal-write-idor-orders.md) | Horizontal write IDOR on orders | High | 8.1 | `PATCH/DELETE /api/orders/{id}` |
+| [SEC-007](SEC-007-mass-order-listing.md) | Unscoped order listing | Medium | 6.5 | `GET /api/orders` |
 
-Each finding includes:
+Evidence samples: [`evidence/`](evidence/)
 
-1. Title, severity, affected endpoint
-2. Steps to reproduce
-3. Expected vs actual
-4. Impact
-5. Remediation
-6. Evidence notes (manual + automated test mapping)
-7. References (OWASP / CWE)
+## Report structure
+
+1. Metadata table (ID, severity, CVSS 3.1 vector, asset, status)
+2. Summary
+3. Prerequisites
+4. Steps to reproduce (HTTP)
+5. Expected vs actual
+6. Impact
+7. Evidence (file links + automated test mapping)
+8. Remediation
+9. References (OWASP / CWE)
+
+Severity rubric: [`docs/SEVERITY.md`](../docs/SEVERITY.md)  
+Methodology: [`docs/METHODOLOGY.md`](../docs/METHODOLOGY.md)
 
 ## Ethical note
 

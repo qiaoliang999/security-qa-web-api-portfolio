@@ -1,0 +1,16 @@
+### SEC-005 evidence — open redirect
+
+GET http://127.0.0.1:8000/api/redirect?next=https://evil.example
+
+# Lab: 302 Location: https://evil.example
+# Secure: 400 Unsafe redirect target
+
+GET http://127.0.0.1:8000/api/redirect?next=//evil.example/phish
+
+# Lab: 302
+# Secure: 400
+
+GET http://127.0.0.1:8000/api/redirect?next=/health
+
+# Lab: 302 Location: /health
+# Secure: 302 Location: /health  (allow-listed path)

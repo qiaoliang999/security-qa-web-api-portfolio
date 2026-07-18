@@ -1,0 +1,12 @@
+{
+  "id": 2,
+  "username": "bob",
+  "role": "user",
+  "email": "bob@example.local",
+  "org_id": 10,
+  "bio": "",
+  "ssn": "222-33-4444",
+  "api_key": "bob-secret-key-demo-only",
+  "password_sha256": "ef92b778bafe771e89245b89ecbc08a44a4e166c06659911881f383d4473e94f",
+  "_comment": "Demo data only. Captured shape from LAB_MODE IDOR response. password_sha256 is weak one-shot material for lab detection, not the stored PBKDF2 hash."
+}

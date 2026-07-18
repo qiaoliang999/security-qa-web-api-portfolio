@@ -6,7 +6,7 @@ Authorized local lab only. Cases cover detection of insecure lab behavior and ve
 
 - **Detect**: asserts vulnerable behavior when `LAB_MODE=true`
 - **Control**: asserts secure behavior when `LAB_MODE=false`
-- **Regression**: keeps insecure access patterns blocked / validated over time
+- **Matrix**: covered in `tests/test_authz_matrix.py`
 
 ---
 
@@ -18,7 +18,6 @@ Authorized local lab only. Cases cover detection of insecure lab behavior and ve
 | Priority | P0 |
 | Mode coverage | Detect + Control |
 | Endpoint | `POST /api/login` |
-| Steps | Compare error for unknown user vs wrong password |
 | Detect expected | Distinct error details |
 | Control expected | Identical generic error |
 | Finding | SEC-004 |
@@ -28,142 +27,102 @@ Authorized local lab only. Cases cover detection of insecure lab behavior and ve
 
 | Field | Detail |
 |-------|--------|
-| Category | Session management |
-| Priority | P0 |
-| Endpoint | `POST /api/login` |
-| Detect expected | Token equals `lab-token-<username>` |
-| Control expected | Random token, not username-derived |
+| Category | Authentication |
+| Detect | `lab-token-{username}` |
+| Control | Random token length ≥ 20 |
 | Automation | `test_lab_predictable_session_token`, `test_secure_mode_random_session_token` |
 
-## TC-S-003 — Sensitive fields on login
+## TC-S-003 — Token abuse
 
 | Field | Detail |
 |-------|--------|
-| Category | Sensitive data exposure |
-| Priority | P0 |
-| Endpoint | `POST /api/login` |
-| Detect expected | Response contains `ssn`, `api_key`, `password_sha256` |
-| Control expected | Those keys absent |
-| Finding | SEC-002 |
-| Automation | `test_lab_login_leaks_sensitive_fields`, `test_secure_login_no_sensitive_fields` |
+| Category | Authentication |
+| Cases | missing bearer, wrong token, forged lab token, empty bearer, malformed scheme |
+| Control expected | 401 |
+| Automation | `test_token_abuse_*` |
 
-## TC-S-004 — IDOR user profile
+## TC-S-004 — User profile IDOR
 
 | Field | Detail |
 |-------|--------|
-| Category | Authorization / BOLA |
-| Priority | P0 |
-| Endpoint | `GET /api/users/{id}` |
-| Steps | Login as alice; request user id 2 |
-| Detect expected | `200` + bob sensitive fields |
-| Control expected | `403` |
+| Category | Authorization (horizontal) |
+| Detect | alice GET `/api/users/2` → 200 + sensitive fields |
+| Control | 403 |
 | Finding | SEC-001 |
-| Automation | `test_lab_idor_user_profile`, `test_secure_blocks_idor_user_profile` |
+| Matrix | yes |
 
-## TC-S-005 — IDOR order object
-
-| Field | Detail |
-|-------|--------|
-| Category | Authorization / BOLA |
-| Priority | P0 |
-| Endpoint | `GET /api/orders/{id}` |
-| Steps | Login as alice; request order 201 (bob) |
-| Detect expected | `200` |
-| Control expected | `403` |
-| Automation | `test_lab_idor_order_access`, `test_secure_blocks_foreign_order` |
-
-## TC-S-006 — Broken order listing scope
+## TC-S-005 — Order read IDOR
 
 | Field | Detail |
 |-------|--------|
-| Category | Authorization |
-| Priority | P1 |
-| Endpoint | `GET /api/orders` |
-| Detect expected | All owners returned for alice |
-| Control expected | Only alice-owned orders |
-| Automation | `test_lab_list_orders_returns_all`, `test_secure_list_orders_scoped` |
+| Category | Authorization (horizontal) |
+| Detect | alice GET `/api/orders/201` → 200 |
+| Control | 403 |
+| Matrix | yes |
 
-## TC-S-007 — Missing function-level authorization
+## TC-S-006 — Order write IDOR (PATCH/DELETE)
 
 | Field | Detail |
 |-------|--------|
-| Category | Authorization / BFLA |
-| Priority | P0 |
-| Endpoint | `GET /api/admin/users` |
-| Steps | Call as alice |
-| Detect expected | `200` full user dump with secrets |
-| Control expected | `403` |
+| Category | Authorization (horizontal write) |
+| Detect | alice mutates/deletes bob order → 200 |
+| Control | 403 |
+| Finding | SEC-006 |
+| Matrix | yes |
+
+## TC-S-007 — Admin function auth
+
+| Field | Detail |
+|-------|--------|
+| Category | Authorization (vertical) |
+| Detect | alice GET `/api/admin/users` → 200 |
+| Control | 403; admin → 200 without sensitive keys |
 | Finding | SEC-003 |
-| Automation | `test_lab_missing_admin_authorization`, `test_secure_admin_endpoint_forbidden_for_user` |
+| Matrix | yes |
 
-## TC-S-008 — Search reflected payload
+## TC-S-008 — Listing scope / tenancy
 
 | Field | Detail |
 |-------|--------|
-| Category | Input validation |
-| Priority | P1 |
-| Endpoint | `POST /api/search` |
-| Payload | `<script>alert(1)</script>` |
-| Detect expected | Payload reflected in response |
-| Control expected | `400` |
+| Category | Authorization (collection) |
+| Detect | alice list includes all owners |
+| Control | alice only owner_id=1; carol order 401 absent |
+| Finding | SEC-007 |
+
+## TC-S-009 — Sensitive field contract
+
+| Field | Detail |
+|-------|--------|
+| Category | Data exposure |
+| Control | forbidden keys never present on secure endpoints |
+| Finding | SEC-002 |
+| Automation | `tests/test_sensitive_fields.py` |
+
+## TC-S-010 — Open redirect allow-list
+
+| Field | Detail |
+|-------|--------|
+| Category | Redirect validation |
+| Detect | external URL → 302 |
+| Control | external / protocol-relative / unknown path → 400; `/health` → 302 |
 | Finding | SEC-005 |
-| Automation | `test_lab_search_reflects_unsanitized_payload`, `test_secure_search_rejects_script_payload` |
 
-## TC-S-009 — SQLi-shaped search boundary
+## TC-S-011 — Search controls (non-blacklist)
+
+| Field | Detail |
+|-------|--------|
+| Category | Input / query safety |
+| Control | max length 100; parameterized SQL; no `reflected` HTML field; SQLi-shaped strings treated as data |
+| Explicit non-goal | regex SQLi/XSS blacklist as "security" |
+
+## TC-S-012 — Email validation on profile update
 
 | Field | Detail |
 |-------|--------|
 | Category | Input validation |
-| Priority | P1 |
-| Endpoint | `POST /api/search` |
-| Payload | `' OR '1'='1` |
-| Control expected | `400` in secure mode |
-| Notes | Non-destructive; lab uses in-memory filters only |
-| Automation | `test_secure_search_rejects_sqli_ish_payload` |
-
-## TC-S-010 — Open redirect
-
-| Field | Detail |
-|-------|--------|
-| Category | URL handling |
-| Priority | P1 |
-| Endpoint | `GET /api/redirect` |
-| Payload | `next=https://evil.example` |
-| Detect expected | 302 to external URL |
-| Control expected | `400` |
-| Finding | SEC-005 |
-| Automation | `test_lab_open_redirect`, `test_secure_blocks_open_redirect` |
-
-## TC-S-011 — Invalid email accepted (lab) / rejected (secure)
-
-| Field | Detail |
-|-------|--------|
-| Category | Input validation |
-| Priority | P2 |
-| Endpoint | `PATCH /api/me` |
-| Payload | `email=not-an-email` |
-| Detect expected | `200` stores invalid email |
-| Control expected | `400` |
-| Automation | `test_lab_profile_update_accepts_invalid_email`, `test_secure_profile_update_rejects_invalid_email` |
-
-## TC-S-012 — Unauthenticated access blocked
-
-| Field | Detail |
-|-------|--------|
-| Category | Authentication gate |
-| Priority | P0 |
-| Endpoints | orders, users, search |
-| Expected | `401` without token in both modes |
-| Automation | `test_unauthenticated_endpoints_blocked`, `test_me_requires_auth` |
+| Detect | invalid email accepted |
+| Control | invalid → 400; valid → 200 |
 
 ---
 
-## Coverage matrix (summary)
-
-| OWASP API Top 10 theme | Cases |
-|------------------------|-------|
-| API1 BOLA / IDOR | TC-S-004, TC-S-005, TC-S-006 |
-| API3 Property-level / excess data | TC-S-003, TC-S-007 |
-| API5 Function-level auth | TC-S-007 |
-| Authn weaknesses | TC-S-001, TC-S-002, TC-S-012 |
-| Input validation / redirect | TC-S-008–TC-S-011 |
+Manual functional cases: [`functional-test-cases.md`](functional-test-cases.md)

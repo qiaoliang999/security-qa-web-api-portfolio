@@ -3,28 +3,26 @@
 | Field | Value |
 |-------|-------|
 | **Finding ID** | SEC-003 |
-| **Title** | Non-admin authenticated users can list all users via admin endpoint |
+| **Title** | Non-admin authenticated users can list all users via admin API |
 | **Severity** | Critical |
-| **CVSS (qualitative)** | Critical — vertical privilege escalation + mass data exposure |
+| **CVSS 3.1 vector** | `CVSS:3.1/AV:N/AC:L/PR:L/UI:N/S:U/C:H/I:L/A:N` |
+| **CVSS 3.1 score** | 7.1 (qualitative **Critical** when combined with sensitive field dump) |
 | **Status** | Open in `LAB_MODE=true`; fixed in secure baseline |
 | **Affected asset** | Security QA Lab API (authorized local lab only) |
 | **Affected endpoint** | `GET /api/admin/users` |
-| **Component** | Function-level authorization / role-based access control |
-| **Environment** | Local demo application — **authorized lab only** |
-| **Reporter role** | Security QA / AppSec testing |
+| **Component** | Function-level authorization / vertical privilege escalation |
+| **Environment** | Local demo — **authorized lab only** |
 
 ## Summary
 
-The admin-only users listing endpoint validates authentication but does not enforce role-based authorization when `LAB_MODE=true`. Any logged-in user can retrieve the full user directory with sensitive attributes. This is **Broken Function Level Authorization** (OWASP API5:2023) combined with excessive data exposure.
+The admin user listing endpoint authenticates the caller but, in lab mode, does not verify `role == admin`. Any user token returns the full directory including sensitive fields. This is **Broken Function Level Authorization** (OWASP API5:2023).
 
 ## Prerequisites
 
-- Lab application running with `LAB_MODE=true`
-- Valid low-privilege session (alice or bob)
+- `LAB_MODE=true`
+- Low-privilege session (alice)
 
 ## Steps to reproduce
-
-1. Login as a normal user:
 
 ```http
 POST /api/login
@@ -33,54 +31,45 @@ Content-Type: application/json
 {"username":"alice","password":"password123"}
 ```
 
-2. Call the admin endpoint with alice's token:
-
 ```http
 GET /api/admin/users
 Authorization: Bearer <alice_token>
 ```
 
-3. Observe HTTP 200 and a list of all users including sensitive fields.
-
 ## Expected result
 
-- HTTP 403 Forbidden for non-admin principals
-- Even for admins, responses should omit secrets unless a separate privileged break-glass flow exists
+HTTP 403 Forbidden for non-admin roles.
 
 ## Actual result (lab mode)
 
-- HTTP 200
-- Full user list with `ssn`, `api_key`, and password hash fields for each account
+HTTP 200 with full user list and sensitive attributes.
 
 ## Impact
 
-- Vertical privilege escalation to administrative data access
-- Mass disclosure of user directory and sensitive attributes
-- Enables targeted attacks against every account in the system
-- Undermines any assumed isolation between user and admin functions
+- Vertical privilege escalation to admin-only data plane
+- Mass disclosure of accounts and secrets
+- Staging ground for further lateral movement
 
-## Evidence notes
+## Evidence
 
-- Automated detection: `tests/test_authorization.py::test_lab_missing_admin_authorization`
-- Secure control: `tests/test_authorization.py::test_secure_admin_endpoint_forbidden_for_user`
-- Admin happy path secure mode: `tests/test_authorization.py::test_secure_admin_endpoint_allowed_for_admin`
+- Sample: [`evidence/SEC-003-admin-users.http`](evidence/SEC-003-admin-users.http)
+- Automated: `tests/test_authorization.py::test_lab_missing_admin_authorization`
+- Control: `tests/test_authorization.py::test_secure_admin_endpoint_forbidden_for_user`
+- Matrix rows: `alice/bob/carol GET /api/admin/users → 403` (secure)
 
 ## Remediation
 
-1. Enforce explicit role checks on all admin routes server-side (never rely on UI hiding)
-2. Centralize authorization (decorator/dependency/policy middleware) to avoid missed checks
-3. Use deny-by-default routing for `/admin/*`
-4. Add security regression tests for every privileged endpoint with a non-privileged principal
-5. Consider separate admin service/network boundary for high-risk operations
-6. Audit logs for privileged endpoint access
+1. Central role dependency (`require_admin` / `require_roles("admin")`) on every admin route.
+2. Deny by default; never rely on UI hiding of admin features.
+3. Separate admin router with a shared dependency guard.
+4. Authz matrix regression in CI.
 
 ## References
 
 - OWASP API Security Top 10 — API5:2023 Broken Function Level Authorization
-- OWASP Top 10 — A01 Broken Access Control
 - CWE-285: Improper Authorization
 - CWE-862: Missing Authorization
 
 ---
 
-*This report documents an intentional vulnerability in an authorized local Security QA lab application. Do not use these techniques against systems without explicit written permission.*
+*Authorized local lab finding only.*

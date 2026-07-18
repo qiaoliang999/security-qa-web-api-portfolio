@@ -1,0 +1,16 @@
+### SEC-003 evidence — missing function-level authorization
+
+POST http://127.0.0.1:8000/api/login
+Content-Type: application/json
+
+{
+  "username": "alice",
+  "password": "password123"
+}
+
+# Use returned token
+GET http://127.0.0.1:8000/api/admin/users
+Authorization: Bearer TOKEN
+
+# Lab: 200 + full user dump with sensitive fields
+# Secure: 403
