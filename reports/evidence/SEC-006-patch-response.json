@@ -1,0 +1,10 @@
+{
+  "id": 201,
+  "owner_id": 2,
+  "org_id": 10,
+  "item": "Keyboard",
+  "amount": 79.0,
+  "notes": "hijacked by alice",
+  "status": "open",
+  "_evidence_note": "Lab-mode sample only. Alice (id=1) successfully PATCHed bob's order; secure baseline returns 403 instead."
+}

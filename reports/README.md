@@ -11,10 +11,12 @@ One finding per report. Each report includes CVSS 3.1 vector + qualitative sever
 | [SEC-003](SEC-003-missing-function-level-auth.md) | Missing function-level auth on admin API | Critical | 8.8 | `GET /api/admin/users` |
 | [SEC-004](SEC-004-username-enumeration.md) | Username enumeration via auth errors | Medium | 5.3 | `POST /api/login` |
 | [SEC-005](SEC-005-open-redirect.md) | Open redirect via unrestricted `next` | Medium | 6.1 | `GET /api/redirect` |
-| [SEC-006](SEC-006-horizontal-write-idor-orders.md) | Horizontal write IDOR on orders | High | 8.1 | `PATCH/DELETE /api/orders/{id}` |
+| [SEC-006](SEC-006-horizontal-write-idor-orders.md) | Horizontal write IDOR on orders | High | 7.1 / 8.1* | `PATCH/DELETE /api/orders/{id}` |
 | [SEC-007](SEC-007-mass-order-listing.md) | Unscoped order listing | Medium | 6.5 | `GET /api/orders` |
 
 Evidence samples: [`evidence/`](evidence/)
+
+\*SEC-006 base vector scores **7.1** (I:H/A:L); index band **8.1** is used when full delete availability is weighted. See the finding report for the exact vector.
 
 ## Report structure
 
