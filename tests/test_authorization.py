@@ -224,3 +224,49 @@ def test_cross_tenant_order_not_listed_for_alice(secure_client):
     ids = {o["id"] for o in res.json()["orders"]}
     assert 401 not in ids
     assert 101 in ids
+
+
+@pytest.mark.authz
+@pytest.mark.security
+def test_secure_blocks_cross_tenant_order_read(secure_client):
+    """Alice (org 10) cannot read carol's order 401 even with a valid token."""
+    from tests.conftest import CAROL
+
+    alice_token = login(secure_client, *ALICE)
+    res = secure_client.get("/api/orders/401", headers=auth_header(alice_token))
+    assert res.status_code == 403
+
+    # Owner still has access — control is ownership, not "object missing".
+    carol_token = login(secure_client, *CAROL)
+    own = secure_client.get("/api/orders/401", headers=auth_header(carol_token))
+    assert own.status_code == 200
+    assert own.json()["owner_id"] == 4
+
+
+@pytest.mark.authz
+@pytest.mark.security
+def test_secure_blocks_cross_tenant_order_write(secure_client):
+    """Write-side authz also denies cross-tenant PATCH/DELETE."""
+    alice_token = login(secure_client, *ALICE)
+    patch = secure_client.patch(
+        "/api/orders/401",
+        headers=auth_header(alice_token),
+        json={"notes": "should not stick"},
+    )
+    assert patch.status_code == 403
+
+    delete = secure_client.delete("/api/orders/401", headers=auth_header(alice_token))
+    assert delete.status_code == 403
+
+
+@pytest.mark.authz
+@pytest.mark.security
+def test_secure_user_cannot_elevate_via_admin_listing(secure_client):
+    """Vertical: non-admin listing must not return any user rows or secrets."""
+    alice_token = login(secure_client, *ALICE)
+    res = secure_client.get("/api/admin/users", headers=auth_header(alice_token))
+    assert res.status_code == 403
+    # Error body must not include user inventory either
+    body = res.json()
+    assert "users" not in body
+    assert_no_sensitive_fields(body)

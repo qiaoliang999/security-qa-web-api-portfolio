@@ -1,7 +1,7 @@
 """Authentication security and functional tests."""
 
 import pytest
-from tests.conftest import ALICE, ADMIN, auth_header, login
+from tests.conftest import ALICE, ADMIN, BOB, auth_header, login
 from tests.helpers.contracts import assert_no_sensitive_fields
 
 
@@ -152,6 +152,47 @@ def test_token_abuse_empty_bearer(secure_client):
 @pytest.mark.security
 def test_token_abuse_malformed_header(secure_client):
     res = secure_client.get("/api/me", headers={"Authorization": "Token abc"})
+    assert res.status_code == 401
+
+
+@pytest.mark.authn
+@pytest.mark.security
+def test_token_abuse_bearer_case_insensitive_prefix(secure_client):
+    """Prefix matching is case-insensitive, but a random body still must fail."""
+    res = secure_client.get("/api/me", headers={"Authorization": "bearer not-a-real-token"})
+    assert res.status_code == 401
+
+
+@pytest.mark.authn
+@pytest.mark.security
+def test_token_from_other_session_does_not_cross_users(secure_client):
+    """Alice's token must not resolve to bob's profile via /api/me."""
+    alice_token = login(secure_client, *ALICE)
+    bob_token = login(secure_client, *BOB)
+    assert alice_token != bob_token
+
+    alice_me = secure_client.get("/api/me", headers=auth_header(alice_token))
+    bob_me = secure_client.get("/api/me", headers=auth_header(bob_token))
+    assert alice_me.status_code == 200
+    assert bob_me.status_code == 200
+    assert alice_me.json()["username"] == "alice"
+    assert bob_me.json()["username"] == "bob"
+    assert alice_me.json()["id"] != bob_me.json()["id"]
+
+
+@pytest.mark.authn
+@pytest.mark.security
+def test_token_reuse_after_db_session_clear_fails(secure_client):
+    """Clearing the sessions table invalidates previously issued tokens."""
+    from app import db as db_mod
+
+    token = login(secure_client, *ALICE)
+    assert secure_client.get("/api/me", headers=auth_header(token)).status_code == 200
+
+    with db_mod.get_connection() as conn:
+        db_mod.clear_sessions(conn)
+
+    res = secure_client.get("/api/me", headers=auth_header(token))
     assert res.status_code == 401
 
 
