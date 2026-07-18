@@ -7,6 +7,7 @@ They are skipped automatically if Playwright browsers are not installed.
 
 from __future__ import annotations
 
+import os
 import socket
 import subprocess
 import sys
@@ -16,6 +17,8 @@ from pathlib import Path
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
+
+pytestmark = pytest.mark.ui
 
 
 def _free_port() -> int:
@@ -28,8 +31,9 @@ def _free_port() -> int:
 def live_server():
     port = _free_port()
     env = {
-        **dict(**{k: v for k, v in __import__("os").environ.items()}),
+        **os.environ,
         "LAB_MODE": "true",
+        "DATABASE_URL": "sqlite:///:memory:",
         "PYTHONPATH": str(ROOT),
     }
     proc = subprocess.Popen(
@@ -49,7 +53,6 @@ def live_server():
         stderr=subprocess.DEVNULL,
     )
     base = f"http://127.0.0.1:{port}"
-    # Wait for server readiness
     import urllib.request
 
     deadline = time.time() + 15
@@ -75,7 +78,7 @@ def live_server():
 
 
 def test_ui_login_page_renders(live_server):
-    playwright = pytest.importorskip("playwright.sync_api")
+    pytest.importorskip("playwright.sync_api")
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
@@ -100,7 +103,7 @@ def test_ui_login_page_renders(live_server):
 
 
 def test_ui_home_shows_lab_mode(live_server):
-    playwright = pytest.importorskip("playwright.sync_api")
+    pytest.importorskip("playwright.sync_api")
     from playwright.sync_api import sync_playwright
 
     with sync_playwright() as p:
