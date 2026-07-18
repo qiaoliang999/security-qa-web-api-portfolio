@@ -2,12 +2,22 @@
 
 Readable table-driven coverage for horizontal and vertical access control in
 secure mode. Lab mode detection for the same surfaces lives in other modules.
+
+How to extend
+-------------
+1. Append a row to ``SECURE_AUTHZ_MATRIX``:
+   ``(actor, method, path, body_or_None, expected_status, note)``
+2. ``actor`` is one of: ``alice``, ``bob``, ``admin``, ``carol``, ``anon``.
+3. Prefer asserting status only here; payload contracts belong in
+   ``test_sensitive_fields.py`` / dedicated cases.
+4. Keep IDs stable and human-readable — the parametrize ``ids=`` list is derived
+   from the row so failures name the abuse case directly.
 """
 
 from __future__ import annotations
 
 import pytest
-from tests.conftest import ALICE, BOB, ADMIN, CAROL, auth_header, login
+from tests.conftest import ALICE, BOB, ADMIN, CAROL, api_request, login
 
 # (actor, method, path, body_or_None, expected_status, note)
 # actor: alice | bob | admin | carol | anon
@@ -77,21 +87,12 @@ _CREDS = {
     ids=[f"{a}:{m}:{p}:{e}:{n}" for a, m, p, _, e, n in SECURE_AUTHZ_MATRIX],
 )
 def test_secure_authz_matrix(secure_client, actor, method, path, body, expected, note):
-    headers = {}
+    token = None
     if actor != "anon":
         user, pw = _CREDS[actor]
         token = login(secure_client, user, pw)
-        headers = auth_header(token)
 
-    if method == "GET":
-        res = secure_client.get(path, headers=headers)
-    elif method == "PATCH":
-        res = secure_client.patch(path, headers=headers, json=body or {})
-    elif method == "DELETE":
-        res = secure_client.delete(path, headers=headers)
-    else:
-        raise AssertionError(f"unsupported method {method}")
-
+    res = api_request(secure_client, method, path, token=token, json_body=body)
     assert res.status_code == expected, (
         f"[{note}] {actor} {method} {path} expected {expected}, got {res.status_code}: {res.text}"
     )
@@ -112,5 +113,5 @@ def test_lab_authz_failures_detectable(lab_client, actor, path, expected):
     """Lab mode still authenticates but intentionally skips object/function authz."""
     user, pw = _CREDS[actor]
     token = login(lab_client, user, pw)
-    res = lab_client.get(path, headers=auth_header(token))
+    res = api_request(lab_client, "GET", path, token=token)
     assert res.status_code == expected
