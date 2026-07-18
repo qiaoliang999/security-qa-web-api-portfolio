@@ -8,6 +8,28 @@ Dual-mode FastAPI lab for **authorized local Security QA practice**: intentional
 
 ---
 
+## For hiring managers / reviewers (60 seconds)
+
+**Role signal:** Security QA (API authn/authz abuse cases + automated regression)
+
+**What you can verify in this repo:**
+
+- Dual-mode lab: intentional flaws (`LAB_MODE=true`) vs secure baseline with real controls (`LAB_MODE=false`) — not payload blacklists
+- Parametrized authorization matrix (roles × resources × methods × expected status)
+- Structured findings with CVSS 3.1 vectors and request/response evidence samples
+- CI runs lab detection **and** secure-control verification as separate jobs (JUnit/HTML artifacts)
+- Documented methodology and severity rubric suitable for portfolio review
+
+**Start here (3 links):**
+
+1. Authz matrix tests → [`tests/test_authz_matrix.py`](tests/test_authz_matrix.py)
+2. Sample Critical finding → [`reports/SEC-003-missing-function-level-auth.md`](reports/SEC-003-missing-function-level-auth.md)
+3. Assessment methodology → [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)
+
+CI workflow: [`.github/workflows/security-qa-tests.yml`](.github/workflows/security-qa-tests.yml)
+
+---
+
 ## What this is
 
 A small multi-role, multi-object API used to practice:
@@ -131,7 +153,8 @@ pytest -q -m ui
 | SEC-006 | High | Horizontal write IDOR on orders |
 | SEC-007 | Medium | Unscoped order listing |
 
-Details and CVSS vectors: [`reports/`](reports/README.md)
+Details and CVSS vectors: [`reports/`](reports/README.md)  
+Evidence samples: [`reports/evidence/`](reports/evidence/)
 
 ---
 
