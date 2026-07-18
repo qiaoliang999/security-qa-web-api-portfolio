@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 
 from app import db
 from app.auth import CurrentUser, DbDep, require_admin
@@ -20,11 +20,13 @@ _SEED_PLAINTEXT = {u["username"]: u["password"] for u in SEED_USERS}
 def admin_list_users(current: CurrentUser, conn: DbDep) -> dict[str, Any]:
     """
     LAB: missing function-level authorization — any authenticated user may list.
-    SECURE: admin role required; allow-list projection (no ssn/api_key/hash).
+    SECURE: central ``require_admin`` role check + allow-list projection
+    (no ssn / api_key / password material).
     """
     if not lab_mode_enabled():
-        if current["role"] != "admin":
-            raise HTTPException(status_code=403, detail="Forbidden")
+        # Reuse the same checker used by /api/admin/stats so vertical control
+        # cannot drift between admin surfaces.
+        require_admin(current)
         users = [to_public_user(u) for u in db.list_users(conn)]
         return {"users": users}
 

@@ -19,6 +19,9 @@ from fastapi import Depends, Header, HTTPException
 from app import db
 from app.config import lab_mode_enabled
 
+# NOTE: get_optional_user was removed — unauthenticated optional paths should
+# call public handlers without invoking the session store.
+
 
 def get_db() -> sqlite3.Connection:
     """Yield a DB connection; commit on success, rollback on error."""
@@ -37,18 +40,26 @@ DbDep = Annotated[sqlite3.Connection, Depends(get_db)]
 
 
 def _extract_bearer(authorization: Optional[str]) -> Optional[str]:
+    """Extract a Bearer token.
+
+    Only the ``Authorization: Bearer <token>`` form is accepted (RFC 6750).
+    Bare tokens, alternate schemes (``Token``, ``Basic``, …), or whitespace-only
+    credentials are rejected so scheme-less header smuggling cannot succeed.
+    """
     if not authorization:
         return None
-    if authorization.lower().startswith("bearer "):
-        return authorization.split(" ", 1)[1].strip()
-    return authorization.strip() or None
+    scheme, _, remainder = authorization.partition(" ")
+    if scheme.lower() != "bearer":
+        return None
+    token = remainder.strip()
+    return token or None
 
 
 def get_current_user(
     conn: DbDep,
     authorization: Optional[str] = Header(default=None),
 ) -> dict[str, Any]:
-    """Require a valid session token. Raises 401 otherwise."""
+    """Require a valid Bearer session token. Raises 401 otherwise."""
     token = _extract_bearer(authorization)
     if not token:
         raise HTTPException(status_code=401, detail="Unauthorized")
@@ -56,16 +67,6 @@ def get_current_user(
     if not user:
         raise HTTPException(status_code=401, detail="Unauthorized")
     return user
-
-
-def get_optional_user(
-    conn: DbDep,
-    authorization: Optional[str] = Header(default=None),
-) -> Optional[dict[str, Any]]:
-    token = _extract_bearer(authorization)
-    if not token:
-        return None
-    return db.get_user_by_token(conn, token)
 
 
 CurrentUser = Annotated[dict[str, Any], Depends(get_current_user)]

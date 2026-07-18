@@ -157,6 +157,19 @@ def test_token_abuse_malformed_header(secure_client):
 
 @pytest.mark.authn
 @pytest.mark.security
+def test_token_requires_bearer_scheme(secure_client):
+    """Valid session material without the Bearer scheme must not authenticate."""
+    token = login(secure_client, *ALICE)
+    res = secure_client.get("/api/me", headers={"Authorization": token})
+    assert res.status_code == 401
+    # Same credential works when presented correctly.
+    ok = secure_client.get("/api/me", headers=auth_header(token))
+    assert ok.status_code == 200
+    assert ok.json()["username"] == "alice"
+
+
+@pytest.mark.authn
+@pytest.mark.security
 def test_token_abuse_bearer_case_insensitive_prefix(secure_client):
     """Prefix matching is case-insensitive, but a random body still must fail."""
     res = secure_client.get("/api/me", headers={"Authorization": "bearer not-a-real-token"})

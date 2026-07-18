@@ -38,12 +38,6 @@ class OrderUpdateRequest(BaseModel):
     status: Optional[str] = Field(default=None, max_length=32)
 
 
-class OrderCreateRequest(BaseModel):
-    item: str = Field(min_length=1, max_length=200)
-    amount: float = Field(ge=0)
-    notes: str = Field(default="", max_length=2000)
-
-
 # ---------------------------------------------------------------------------
 # Responses (allow-listed)
 # ---------------------------------------------------------------------------
@@ -60,12 +54,6 @@ class PublicUserResponse(BaseModel):
     email: str
     org_id: int
     bio: str = ""
-
-
-class AdminUserResponse(PublicUserResponse):
-    """Admin listing still does not expose ssn/api_key/password_hash."""
-
-    pass
 
 
 class OrderResponse(BaseModel):
@@ -114,7 +102,8 @@ class MessageResponse(BaseModel):
 # Helpers for building safe projections from DB rows
 # ---------------------------------------------------------------------------
 
-SENSITIVE_USER_KEYS = frozenset({"ssn", "api_key", "password_hash", "password"})
+# Align with tests.helpers.contracts.FORBIDDEN_SECURE_KEYS (response allow-list).
+SENSITIVE_USER_KEYS = frozenset({"ssn", "api_key", "password_hash", "password", "password_sha256"})
 
 
 def to_public_user(user: dict[str, Any]) -> dict[str, Any]:
@@ -155,22 +144,3 @@ def to_order(order: dict[str, Any]) -> dict[str, Any]:
         "notes": order["notes"],
         "status": order["status"],
     }
-
-
-def assert_no_sensitive_keys(payload: Any, forbidden: frozenset[str] = SENSITIVE_USER_KEYS) -> list[str]:
-    """Recursively find forbidden keys. Used by tests and can be used in contracts."""
-    found: list[str] = []
-
-    def walk(obj: Any, path: str = "") -> None:
-        if isinstance(obj, dict):
-            for k, v in obj.items():
-                key_path = f"{path}.{k}" if path else k
-                if k in forbidden:
-                    found.append(key_path)
-                walk(v, key_path)
-        elif isinstance(obj, list):
-            for i, item in enumerate(obj):
-                walk(item, f"{path}[{i}]")
-
-    walk(payload)
-    return found
