@@ -35,3 +35,8 @@ blob-report/
 # Local notes
 *.log
 .cache/
+
+# Local SQLite / artifacts
+*.db
+artifacts/
+security_qa_lab.db

@@ -1,0 +1,41 @@
+[project]
+name = "security-qa-web-api-portfolio"
+version = "2.0.0"
+description = "Authorized local Security QA lab: dual-mode FastAPI app, authz matrix tests, structured findings"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "qiaoliang999" }]
+dependencies = [
+  "fastapi==0.115.6",
+  "uvicorn==0.34.0",
+  "httpx==0.28.1",
+  "pydantic==2.10.4",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest==8.3.4",
+  "pytest-html==4.1.1",
+  "pytest-playwright==0.6.2",
+  "playwright==1.49.1",
+]
+qa = [
+  "bandit==1.8.0",
+  "pip-audit==2.7.3",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+  "ui: optional Playwright UI tests",
+  "security: security-focused cases",
+  "authz: authorization / access control",
+  "authn: authentication / session",
+  "smoke: fast smoke checks",
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", ".venv", "reports"]
+skips = ["B101"]

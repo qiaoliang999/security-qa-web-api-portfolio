@@ -7,10 +7,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  pytest:
+  lab-detection:
+    name: Lab-mode detection suite
     runs-on: ubuntu-latest
     timeout-minutes: 20
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -26,13 +26,109 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Install Playwright browser
-        run: python -m playwright install --with-deps chromium
-
-      - name: Run security QA test suite
+      - name: Run lab detection + dual fixtures suite
         env:
           LAB_MODE: "true"
-        run: pytest -q
+        run: |
+          mkdir -p artifacts
+          pytest -q \
+            --junitxml=artifacts/junit-lab.xml \
+            --html=artifacts/report-lab.html --self-contained-html \
+            -m "not ui"
 
-      - name: Run secure-mode smoke (suite already dual-mode via fixtures)
-        run: pytest -q tests/test_auth.py tests/test_authorization.py tests/test_input_validation.py
+      - name: Upload lab test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lab-pytest-artifacts
+          path: artifacts/
+
+  secure-controls:
+    name: Secure-mode control suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run full suite with LAB_MODE=false default env
+        env:
+          LAB_MODE: "false"
+        run: |
+          mkdir -p artifacts
+          # Fixtures still force per-test mode; env documents intent and
+          # covers any code path that reads process env at import time.
+          pytest -q \
+            --junitxml=artifacts/junit-secure.xml \
+            --html=artifacts/report-secure.html --self-contained-html \
+            -m "not ui"
+
+      - name: Upload secure test artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: secure-pytest-artifacts
+          path: artifacts/
+
+  static-qa:
+    name: Dependency and bandit scan (best effort)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: pip-audit
+        run: pip-audit -r requirements.txt || true
+
+      - name: bandit
+        run: bandit -r app -ll -x tests,.venv || true
+
+  ui-smoke:
+    name: Optional Playwright UI smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+
+      - name: Run UI tests
+        env:
+          LAB_MODE: "true"
+        run: pytest -q -m ui

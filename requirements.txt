@@ -2,6 +2,10 @@ fastapi==0.115.6
 uvicorn==0.34.0
 httpx==0.28.1
 pytest==8.3.4
+pytest-html==4.1.1
 pytest-playwright==0.6.2
 playwright==1.49.1
 pydantic==2.10.4
+# Optional quality gates used in CI (best-effort)
+bandit==1.8.0
+pip-audit==2.7.3

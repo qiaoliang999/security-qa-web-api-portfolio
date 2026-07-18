@@ -1,206 +1,154 @@
-# Security QA Web/API Portfolio
+# Security QA Lab — Web/API Testing Portfolio
 
-Resume-ready portfolio project demonstrating **Security QA / Application Security Testing** skills: intentional local lab API, automated security tests, structured defect reports, and dual-mode (lab vs secure) regression design.
+Dual-mode FastAPI lab for **authorized local Security QA practice**: intentional flaws under `LAB_MODE=true`, real secure baseline under `LAB_MODE=false`, and automated suites that both detect issues and verify controls.
 
-> **Ethical use only.** This application is an **authorized local security lab**. Do not deploy it publicly as a production service. Do not test systems you do not own or lack explicit written permission to assess.
+[![security-qa-tests](https://github.com/qiaoliang999/security-qa-web-api-portfolio/actions/workflows/security-qa-tests.yml/badge.svg)](https://github.com/qiaoliang999/security-qa-web-api-portfolio/actions/workflows/security-qa-tests.yml)
 
-**GitHub user:** [qiaoliang999](https://github.com/qiaoliang999)
-
----
-
-## Purpose
-
-Showcase practical Security QA competence for remote job applications:
-
-- Design and run security-focused API test cases (authn, authz/IDOR, input validation, data exposure)
-- Document findings in industry-style defect reports (severity, repro, impact, remediation)
-- Build automation with **pytest** + **httpx/TestClient** and optional **Playwright** UI checks
-- Demonstrate secure baseline controls via a `LAB_MODE` flag for regression confidence
+> **Ethical use only.** Authorized local security lab. Do not deploy as production. Do not test systems you do not own or lack written permission to assess.
 
 ---
 
-## What this demonstrates for Security QA roles
+## What this is
 
-| Skill | Evidence in this repo |
-|-------|------------------------|
-| Threat-informed test design | Cases mapped to OWASP API Top 10 themes |
-| Broken access control testing | IDOR on users/orders; missing admin function auth |
-| Authn/session testing | Enumeration, predictable tokens, negative login cases |
-| Sensitive data exposure checks | Response field allow-listing verification |
-| Input validation / boundary tests | XSS/SQLi-shaped payloads, length limits, open redirect |
-| Defect reporting | Markdown findings under `reports/` |
-| Automation & CI | pytest suite + GitHub Actions workflow |
-| Secure vs vulnerable baselines | `LAB_MODE=true/false` dual verification |
+A small multi-role, multi-object API used to practice:
+
+1. Abuse-case design (authn, horizontal/vertical authz, write IDOR, data exposure, redirect)
+2. Automated security testing with pytest + FastAPI TestClient
+3. Structured defect reporting (CVSS 3.1 + evidence samples)
+4. Fix verification against a secure baseline that uses **real controls** (not payload blacklists)
+
+Methodology: [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md)  
+Severity rubric: [`docs/SEVERITY.md`](docs/SEVERITY.md)
 
 ---
 
 ## Architecture
 
 ```text
-Client (pytest / browser)
-        |
-        v
- FastAPI app (app/main.py)
-        |
-        +-- LAB_MODE=true  -> intentional vulnerabilities (default)
-        +-- LAB_MODE=false -> secure baseline controls
-        |
- In-memory demo users & orders (no real secrets / no external services)
+app/
+  main.py          # app factory + HTML chrome
+  config.py        # LAB_MODE, seed metadata, redirect allow-list
+  db.py            # SQLite, seed, per-test reset
+  security.py      # PBKDF2 password hashing
+  models.py        # Pydantic DTOs (response allow-lists)
+  auth.py          # get_current_user, require_roles, ownership helpers
+  routers/         # auth, users, orders, admin, search
+tests/
+  test_authz_matrix.py   # roles × resources × methods × status
+  test_authorization.py  # IDOR / BFLA / write IDOR
+  test_auth.py           # authn, enumeration, token abuse
+  test_sensitive_fields.py
+  test_input_validation.py
+  helpers/contracts.py   # forbidden-key assertions
+reports/           # one finding per file + evidence/
 ```
 
-### Intentional lab issues (when `LAB_MODE=true`)
+| Mode | Behavior |
+|------|----------|
+| `LAB_MODE=true` | Intentional BOLA/BFLA, write IDOR, oversharing DTOs, open redirect, enumeration |
+| `LAB_MODE=false` | Central authz dependencies, hashed passwords, public DTO allow-lists, redirect **path map**, scoped listings |
 
-1. **IDOR** on `GET /api/users/{id}` and `GET /api/orders/{id}`
-2. **Sensitive data exposure** in login/profile responses
-3. **Missing function-level authorization** on `GET /api/admin/users`
-4. **Username enumeration** via distinct auth errors + predictable session tokens
-5. **Open redirect** and weak search input validation / reflection
-
-When `LAB_MODE=false`, the same endpoints enforce authorization, generic auth errors, random tokens, redirect allow-listing, and input checks. Automated tests cover **both** detection and control verification.
+Secure mode does **not** claim “SQLi/XSS prevention” via regex blacklists. Search uses parameterized SQL, length limits, and ownership scoping.
 
 ---
 
-## Tech stack
+## Demo accounts (local only)
 
-- Python 3.11+
-- FastAPI + Uvicorn
-- pytest + FastAPI TestClient (Starlette; HTTPX-based)
-- Playwright (optional UI smoke)
-- GitHub Actions CI
-- Markdown findings & test-case docs
+| Username | Password    | Role  | org_id |
+|----------|-------------|-------|--------|
+| alice    | password123 | user  | 10     |
+| bob      | password123 | user  | 10     |
+| carol    | password123 | user  | 20     |
+| admin    | admin       | admin | 10     |
 
----
-
-## Repository layout
-
-```text
-security-qa-web-api-portfolio/
-├── app/                      # Lab API application
-│   ├── main.py
-│   └── config.py
-├── tests/                    # Security + functional automation
-│   ├── conftest.py
-│   ├── test_auth.py
-│   ├── test_authorization.py
-│   ├── test_input_validation.py
-│   └── test_ui_playwright.py
-├── reports/                  # Security findings (defect reports)
-├── test-cases/               # Manual/functional + security case docs
-├── .github/workflows/        # CI
-├── requirements.txt
-├── pytest.ini
-├── LICENSE
-└── README.md
-```
+Fictional credentials. Passwords are stored as PBKDF2 digests in SQLite.
 
 ---
 
 ## Quick start
 
-### 1. Create a virtual environment and install dependencies
-
 ```bash
 cd security-qa-web-api-portfolio
 python -m venv .venv
-
-# Windows Git Bash / macOS / Linux
 source .venv/Scripts/activate 2>/dev/null || source .venv/bin/activate
-
 pip install -r requirements.txt
-```
 
-Optional UI tests:
-
-```bash
-python -m playwright install chromium
-```
-
-### 2. Run the lab application
-
-```bash
-# Intentionally vulnerable (default)
-set LAB_MODE=true          # Windows cmd
-export LAB_MODE=true       # bash
-
+# Run API (lab mode default)
+export LAB_MODE=true
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
-```
 
-- API docs: http://127.0.0.1:8000/docs  
-- Health: http://127.0.0.1:8000/health  
-- Login UI: http://127.0.0.1:8000/login  
-
-Secure baseline:
-
-```bash
+# Secure baseline
 export LAB_MODE=false
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### Demo accounts (local only)
+- OpenAPI: http://127.0.0.1:8000/docs  
+- Health: http://127.0.0.1:8000/health  
 
-| Username | Password     | Role  |
-|----------|--------------|-------|
-| alice    | password123  | user  |
-| bob      | password123  | user  |
-| admin    | admin        | admin |
-
-These are fictional demo credentials for a local lab — not real secrets.
-
-### 3. Run tests
+### Tests
 
 ```bash
-# From repo root with venv active
-pytest -q
+# Full API suite (in-process; no server required)
+pytest -q -m "not ui"
+
+# By marker
+pytest -q -m authz
+pytest -q -m security
+pytest -q -m authn
+
+# With artifacts
+mkdir -p artifacts
+pytest -q -m "not ui" --junitxml=artifacts/junit.xml --html=artifacts/report.html --self-contained-html
 ```
 
-API/security tests use in-process TestClient fixtures and do not require a running server. Playwright tests start a temporary local server and skip cleanly if browsers are missing.
+Optional UI smoke (requires Playwright browsers):
+
+```bash
+python -m playwright install chromium
+pytest -q -m ui
+```
 
 ---
 
-## Sample findings summary
+## Findings (lab mode)
 
 | ID | Severity | Title |
 |----|----------|-------|
 | SEC-001 | High | IDOR on user profiles |
 | SEC-002 | High | Sensitive data exposure in API responses |
-| SEC-003 | Critical | Missing function-level authorization on admin users API |
-| SEC-004 | Medium | Username enumeration via authentication error messages |
-| SEC-005 | Medium | Open redirect and missing search input validation |
+| SEC-003 | Critical | Missing function-level authorization on admin API |
+| SEC-004 | Medium | Username enumeration via auth errors |
+| SEC-005 | Medium | Open redirect |
+| SEC-006 | High | Horizontal write IDOR on orders |
+| SEC-007 | Medium | Unscoped order listing |
 
-Full write-ups: [`reports/`](reports/README.md)
-
----
-
-## Test suites
-
-| Module | Focus |
-|--------|-------|
-| `tests/test_auth.py` | Login happy/negative, enumeration, tokens, sensitive login fields |
-| `tests/test_authorization.py` | IDOR users/orders, listing scope, admin BFLA |
-| `tests/test_input_validation.py` | Search payloads, open redirect, email validation, unauthenticated gates |
-| `tests/test_ui_playwright.py` | Login page + lab home smoke (optional) |
-
-Manual cases: [`test-cases/`](test-cases/)
+Details and CVSS vectors: [`reports/`](reports/README.md)
 
 ---
 
-## Design note: lab detection vs secure controls
+## CI
 
-This project intentionally uses **dual-mode testing**:
+GitHub Actions workflow [`.github/workflows/security-qa-tests.yml`](.github/workflows/security-qa-tests.yml):
 
-- **Lab fixtures** assert that insecure behavior is detectable (what a Security QA would file).
-- **Secure fixtures** assert that remediations hold (regression / control verification).
+| Job | Purpose |
+|-----|---------|
+| `lab-detection` | Full suite with `LAB_MODE=true`; junit/html artifacts |
+| `secure-controls` | Full suite with `LAB_MODE=false`; junit/html artifacts |
+| `static-qa` | `pip-audit` + `bandit` (best effort, non-blocking) |
+| `ui-smoke` | Optional Playwright (non-blocking) |
 
-That mirrors a real workflow: find → report → verify fix → prevent regression.
+Fixtures still force per-test mode explicitly; CI env documents the dual baseline.
 
 ---
 
-## Ethical / legal note
+## Residual limitations (honest)
 
-- Local demonstration and portfolio use only
-- No malware, no weaponized exploits, no targeting of third-party systems
-- All “sensitive” values are fake demo data
-- Always obtain authorization before security testing
+- Session model is an opaque bearer map in SQLite — not JWT/OAuth2/OIDC.
+- No rate limiting, account lockout, CSRF (cookie-less API), or MFA.
+- Tenancy is a simple `org_id` column, not a full multi-tenant product model.
+- Lab mode remains intentionally vulnerable for training; do not expose it on a network.
+- Playwright coverage is smoke-level only; primary evidence is API automation.
+- CVSS scores are analyst-applied for portfolio realism; re-score for your org's threat model.
 
 ---
 
