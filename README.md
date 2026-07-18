@@ -88,18 +88,27 @@ uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ### Tests
 
 ```bash
-# Full API suite (in-process; no server required)
+# Full API suite (in-process; no server required) — primary regression gate
 pytest -q -m "not ui"
 
-# By marker
+# By marker (prefer markers over free-text node-id filters)
 pytest -q -m authz
-pytest -q -m security
 pytest -q -m authn
+pytest -q -m security
+pytest -q -m smoke
 
-# With artifacts
+# Single module
+pytest -q tests/test_authz_matrix.py
+pytest -q tests/test_authorization.py
+
+# With artifacts (same shape as CI uploads)
 mkdir -p artifacts
-pytest -q -m "not ui" --junitxml=artifacts/junit.xml --html=artifacts/report.html --self-contained-html
+pytest -q -m "not ui" \
+  --junitxml=artifacts/junit.xml \
+  --html=artifacts/report.html --self-contained-html
 ```
+
+Methodology command reference: [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md#exact-commands-local)
 
 Optional UI smoke (requires Playwright browsers):
 

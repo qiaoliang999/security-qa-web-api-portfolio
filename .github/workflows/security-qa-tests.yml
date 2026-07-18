@@ -31,6 +31,8 @@ jobs:
           LAB_MODE: "true"
         run: |
           mkdir -p artifacts
+          # Markers only — never filter node ids by blacklisting the word "security".
+          # Fixtures force per-test mode; LAB_MODE documents the lab-detection baseline.
           pytest -q \
             --junitxml=artifacts/junit-lab.xml \
             --html=artifacts/report-lab.html --self-contained-html \
@@ -42,6 +44,7 @@ jobs:
         with:
           name: lab-pytest-artifacts
           path: artifacts/
+          if-no-files-found: warn
 
   secure-controls:
     name: Secure-mode control suite
@@ -80,6 +83,7 @@ jobs:
         with:
           name: secure-pytest-artifacts
           path: artifacts/
+          if-no-files-found: warn
 
   static-qa:
     name: Dependency and bandit scan (best effort)
