@@ -1,2 +1,2 @@
-# Intentionally vulnerable lab application package.
-# FOR AUTHORIZED LOCAL SECURITY TESTING ONLY.
+# Security QA Lab application package.
+# AUTHORIZED LOCAL SECURITY TESTING ONLY.
